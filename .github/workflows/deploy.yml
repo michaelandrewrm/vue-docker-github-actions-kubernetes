@@ -1,9 +1,7 @@
 name: Vue CI/CD to Kubernetes
 
-# on:
-#   push:
-#     branches:
-#       - master
+on:
+  workflow_dispatch:
 
 env:
   IMAGE_NAME: vue-app
