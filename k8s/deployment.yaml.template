@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vue-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vue
+  template:
+    metadata:
+      labels:
+        app: vue
+    spec:
+      containers:
+        - name: vue-container
+          image: docker.io/${DOCKER_USERNAME}/vue-app:${IMAGE_TAG}
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vue-service
+  namespace: default
+spec:
+  type: LoadBalancer
+  selector:
+    app: vue
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
