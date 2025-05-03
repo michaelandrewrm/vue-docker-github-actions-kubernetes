@@ -31,11 +31,11 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
 
-          - name: Render Kubernetes Manifest
-          run: |
-            export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
-            export IMAGE_TAG=${{ github.sha }}
-            envsubst < ./k8s/k8s-deployment.yaml.template > ./k8s/k8s-deployment.yaml
+      - name: Render Kubernetes Manifest
+        run: |
+          export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+          export IMAGE_TAG=${{ github.sha }}
+          envsubst < ./k8s/k8s-deployment.yaml.template > ./k8s/k8s-deployment.yaml
 
       - name: Apply Kubernetes Manifest
         run: |
