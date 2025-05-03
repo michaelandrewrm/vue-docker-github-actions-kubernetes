@@ -15,7 +15,8 @@ spec:
     spec:
       containers:
         - name: vue-container
-          image: docker.io/${DOCKER_USERNAME}/vue-app:${IMAGE_TAG}
+          image: vue-app:${IMAGE_TAG}
+          # image: docker.io/${DOCKER_USERNAME}/vue-app:${IMAGE_TAG}
           ports:
             - containerPort: 80
 ---
