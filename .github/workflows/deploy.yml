@@ -1,68 +1,46 @@
-name: Deploy Vue App to Kind
+name: Vue CI/CD to Kubernetes
 
 on:
   workflow_dispatch:
 
+env:
+  IMAGE_NAME: vue-app
+  IMAGE_TAG: ${{ github.sha }}
+  REGISTRY: docker.io
+  DEPLOYMENT_NAME: vue-deployment
+  NAMESPACE: default
+
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
-    env:
-      IMAGE_NAME: vue-app
-      IMAGE_TAG: ${{ github.sha }}
-      DEPLOYMENT_NAME: vue-deployment
-      NAMESPACE: default
-
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v3
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Install Kind & kubectl
+      - name: Build and Push Docker Image
         run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.22.0/kind-linux-amd64
-          chmod +x ./kind
-          sudo mv ./kind /usr/local/bin/kind
+          docker build -t $REGISTRY/${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:$IMAGE_TAG .
+          docker push $REGISTRY/${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:$IMAGE_TAG
 
-          K8S_VERSION=$(curl -s https://dl.k8s.io/release/stable.txt)
-          curl -LO "https://dl.k8s.io/release/${K8S_VERSION}/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
-
-      - name: Create Kind Cluster
+      - name: Set up Kubeconfig
         run: |
-          kind create cluster --wait 60s
-
-      - name: Build Docker Image
-        run: |
-          docker build -t $IMAGE_NAME:$IMAGE_TAG .
-
-      - name: Load Docker Image into Kind Cluster
-        run: |
-          kind load docker-image $IMAGE_NAME:$IMAGE_TAG
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
 
       - name: Render Kubernetes Manifest
         run: |
-          export DOCKER_USERNAME=dummy  # Kind doesn't need this
+          export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
           export IMAGE_TAG=${{ github.sha }}
           envsubst < ./k8s/k8s-deployment.yaml.template > ./k8s/k8s-deployment.yaml
 
-      - name: Apply Kubernetes Manifests
+      - name: Apply Kubernetes Manifest
         run: |
           kubectl apply -f ./k8s/k8s-deployment.yaml
 
-      - name: Wait for Pod to Be Ready
+      - name: Deploy to Kubernetes
         run: |
-          kubectl wait --for=condition=ready pod -l app=vue --timeout=60s
-
-      - name: Port Forward & Test HTTP Response
-        run: |
-          kubectl port-forward svc/vue-service 8080:80 &
-          sleep 5  # Wait for the port-forward to start
-          curl -f http://localhost:8080 || (echo "App is not responding!" && exit 1)
-
-      - name: Get Pods
-        run: |
-          kubectl get pods
+          kubectl set image deployment/$DEPLOYMENT_NAME vue-container=$REGISTRY/${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:$IMAGE_TAG --namespace $NAMESPACE
